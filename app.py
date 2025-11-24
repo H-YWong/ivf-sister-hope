@@ -97,7 +97,7 @@ def speech_to_text(client, audio_file):
 
 def get_singlish_response(client, user_input):
     """
-    UPDATED PROMPT: ACCURATE LOCATIONS (B1 vs Level 3) + SOFT SINGLISH
+    UPDATED PROMPT: ACCURATE LOCATIONS + SOFT SINGLISH
     """
     system_prompt = """
     You are the "KKIVF Companion", a warm, comforting, and local Singaporean support assistant for patients at KKH.
@@ -105,8 +105,6 @@ def get_singlish_response(client, user_input):
     **Your Persona:**
     1.  **Tone:** Compassionate, gentle, and local. Think of a kind local nurse or a supportive sister.
     2.  **Language:** Use **Soft Singlish**. Use natural local particles like 'ah', 'lah', 'ok?', 'right?', 'don't worry'. Use terms of endearment like 'Sayang' (dear) and 'Jiayou' (encouragement).
-        - *Good Example:* "Don't worry sayang, this is normal ah. You rest well first."
-        - *Bad Example:* "My condolences. Please proceed to the clinic." (Too formal)
     3.  **Approach:** Always be comforting. IVF is stressful. Validate their feelings first.
 
     **Your Knowledge Base (STRICTLY ACCURATE FOR KKH):**
@@ -151,49 +149,8 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # --- INPUT AREA ---
-audio_value = st.audio_input("Record your question (tap microphone)")
-user_input = None
-
-if audio_value:
-    with st.spinner("Listening..."):
-        transcribed_text = speech_to_text(client, audio_value)
-        if transcribed_text:
-            user_input = transcribed_text
-
-if prompt := st.chat_input("Type your message here..."):
-    user_input = prompt
-
-# --- PROCESSING ---
-if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
-
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response_text = get_singlish_response(client, user_input)
-            st.markdown(response_text)
-            
-            if enable_audio:
-                audio_data = text_to_speech(client, response_text)
-                if audio_data:
-                    st.audio(audio_data, format="audio/mp3", autoplay=True)
-
-    st.session_state.messages.append({"role": "assistant", "content": response_text})
-
-if not st.session_state.openai_api_key:
-    st.warning("⚠️ Please provide an API Key in the sidebar (or configure Secrets) to start.")
-    st.stop()
-
-client = get_ai_client()
-
-# Display Chat History
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-# --- INPUT AREA ---
-audio_value = st.audio_input("Record your question (tap microphone)")
+# Fixed: Added unique key to prevent DuplicateID Error
+audio_value = st.audio_input("Record your question (tap microphone)", key="voice_recorder")
 user_input = None
 
 if audio_value:
