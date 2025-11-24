@@ -2,7 +2,7 @@ import streamlit as st
 from openai import OpenAI
 import os
 
-# --- 1. PAGE CONFIGURATION (KKIVF BRANDING) ---
+# --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="KKIVF - Journey Companion",
     page_icon="🏥",
@@ -22,7 +22,6 @@ st.markdown("""
     .bot-message {
         background-color: #fff0f5;
     }
-    /* Logo Style Header */
     .header-text {
         color: #d63384; 
         font-weight: bold;
@@ -64,7 +63,7 @@ with st.sidebar:
     enable_audio = st.toggle("Enable Voice Response", value=False)
     
     st.divider()
-    st.info("**Emergency:** If you experience severe pain or heavy bleeding, please proceed to KKH O&G 24-hour Urgent Care Centre immediately.")
+    st.info("**Emergency:** If you experience severe pain, heavy bleeding, or breathlessness, please proceed to KKH O&G 24-hour Urgent Care Centre (Basement 1) immediately.")
 
 # --- HELPER FUNCTIONS ---
 
@@ -98,23 +97,28 @@ def speech_to_text(client, audio_file):
 
 def get_singlish_response(client, user_input):
     """
-    STRICT SINGAPORE CONTEXT PROMPT - REVISED FOR GENTLENESS
+    UPDATED PROMPT: ACCURATE LOCATIONS (B1 vs Level 3) + SOFT SINGLISH
     """
     system_prompt = """
-    You are the "KKIVF Companion", a gentle, nurturing, and professional support assistant for patients undergoing IVF at KK Women's and Children's Hospital (KKH).
+    You are the "KKIVF Companion", a warm, comforting, and local Singaporean support assistant for patients at KKH.
     
     **Your Persona:**
-    1.  **Tone:** Soft, empathetic, and calming. Like a caring nurse or a very close, gentle friend.
-    2.  **Language Style:** Use warm, standard English. You may use a very subtle Singaporean touch (e.g., "Take care", "Rest well"), but avoid heavy slang like 'meh', 'sia', or 'lor'.
-    3.  **Approach:** Always validate the user's feelings first. If they are sad, be comforting. If they are anxious, be reassuring.
+    1.  **Tone:** Compassionate, gentle, and local. Think of a kind local nurse or a supportive sister.
+    2.  **Language:** Use **Soft Singlish**. Use natural local particles like 'ah', 'lah', 'ok?', 'right?', 'don't worry'. Use terms of endearment like 'Sayang' (dear) and 'Jiayou' (encouragement).
+        - *Good Example:* "Don't worry sayang, this is normal ah. You rest well first."
+        - *Bad Example:* "My condolences. Please proceed to the clinic." (Too formal)
+    3.  **Approach:** Always be comforting. IVF is stressful. Validate their feelings first.
 
-    **Your Knowledge Base (STRICTLY SINGAPOREAN):**
-    1.  **Financial:** Mention **Medisave** withdrawal limits (approx $6,000/$5,000 cycles) and **Government Co-Funding** (up to 75%).
-    2.  **Locations:** Refer to KKH IVF Centre (Level 4), or KKH O&G Urgent Care (Basement 1) for emergencies.
-    3.  **Medical Disclaimer:** You are an AI companion, not a doctor. Always advise consulting their KKH coordinator or specialist for medical decisions.
+    **Your Knowledge Base (STRICTLY ACCURATE FOR KKH):**
+    1.  **Locations (CRITICAL DISTINCTION):**
+        - **Consultations, Scans & Monitoring:** Go to **KKIVF Centre at Basement 1 (Children's Tower)**.
+        - **Procedures (Egg Retrieval & Embryo Transfer):** Go to **Level 3**.
+        - **Emergencies (Severe Pain/Bleeding):** Go to **O&G 24-Hour Urgent Care at Basement 1 (Women's Tower)**.
+    2.  **Financial:** Mention Medisave withdrawal limits (approx $6k/$5k) and Govt Co-Funding.
+    3.  **Process:** Standard IVF protocols (Stimulation, Retrieval, Transfer, TWW).
     
-    **Critical Safety Rule:**
-    If the user mentions heavy bleeding, severe pain, or breathlessness, gently but firmly urge them to go to KKH O&G Urgent Care immediately.
+    **Safety Rule:**
+    - Disclaimer: "I am an AI, not a doctor. Please check with your nurse or specialist."
     """
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -126,7 +130,7 @@ def get_singlish_response(client, user_input):
     response = client.chat.completions.create(
         model="gpt-4o", 
         messages=messages,
-        temperature=0.5 # Lower temperature = more calm/stable, less random
+        temperature=0.6 
     )
     return response.choices[0].message.content
 
@@ -134,6 +138,48 @@ def get_singlish_response(client, user_input):
 
 st.markdown('<p class="header-text">KKIVF 🏥</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-text">Your compassionate guide through the IVF journey.</p>', unsafe_allow_html=True)
+
+if not st.session_state.openai_api_key:
+    st.warning("⚠️ Please provide an API Key in the sidebar (or configure Secrets) to start.")
+    st.stop()
+
+client = get_ai_client()
+
+# Display Chat History
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# --- INPUT AREA ---
+audio_value = st.audio_input("Record your question (tap microphone)")
+user_input = None
+
+if audio_value:
+    with st.spinner("Listening..."):
+        transcribed_text = speech_to_text(client, audio_value)
+        if transcribed_text:
+            user_input = transcribed_text
+
+if prompt := st.chat_input("Type your message here..."):
+    user_input = prompt
+
+# --- PROCESSING ---
+if user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response_text = get_singlish_response(client, user_input)
+            st.markdown(response_text)
+            
+            if enable_audio:
+                audio_data = text_to_speech(client, response_text)
+                if audio_data:
+                    st.audio(audio_data, format="audio/mp3", autoplay=True)
+
+    st.session_state.messages.append({"role": "assistant", "content": response_text})
 
 if not st.session_state.openai_api_key:
     st.warning("⚠️ Please provide an API Key in the sidebar (or configure Secrets) to start.")
